@@ -2,7 +2,6 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-import requests
 from requests import Response, Session
 from requests.exceptions import HTTPError
 
@@ -79,6 +78,9 @@ class DLocalClient:
             print(f"Other error occurred: {err}")  # Better to use logging
             raise
 
+    def close(self):
+        self.session.close()
+
     def __enter__(self):
         return self
 
@@ -87,6 +89,3 @@ class DLocalClient:
 
     def __del__(self):
         self.close()
-
-    def close(self):
-        self.session.close()
