@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Dict, Literal, Optional
 
 
 @dataclass
-class CashoutRequest:
+class PayoutRequest:
     version: str
     purpose: str
     external_id: str
@@ -44,3 +44,71 @@ class CashoutRequest:
             "pass": self.password,
             "extra_info": self.extra_info,
         }
+
+
+@dataclass
+class ChinaPayout(PayoutRequest):
+    account_type: Optional[Literal["C", "S"]] = None
+    country: Literal["CN"] = "CN"
+    currency: Literal["CNY", "USD"]
+    document_type: Optional[Literal["PASS", "TAXID"]] = None
+    purpose: Optional[Literal["EPBTOB", "EPREMT"]] = None
+
+    @property
+    def valid_bank_acct(self):
+        return len(self.bank_account) < 9 or len(self.bank_account) > 25
+
+    @property
+    def valid_bank_card(self):
+        return len(self.bank_account) < 15 or len(self.bank_account) > 18
+
+    @property
+    def valid_han_beneficiary_name(self):
+        return all("\u4e00" <= char <= "\u9fff" for char in self.beneficiary_name)
+
+    def validate_required_fields(self):
+        required_fields = [
+            "login",
+            "password",
+            "external_id",
+            "beneficiary_name",
+            "country",
+            "bank_branch",
+            "bank_account",
+            "currency",
+            "amount",
+            "phone",
+            "document_id",
+        ]
+
+        for field in required_fields:
+            value = getattr(self, field)
+            if value is None or value == "":
+                raise ValueError(f"{field} is required and cannot be empty")
+
+        if len(self.bank_account) < 9 or len(self.bank_account) > 25:
+            raise ValueError("bank_account must be between 9 and 25 digits")
+
+        if self.currency not in ["CNY", "USD"]:
+            raise ValueError("currency must be either 'CNY' or 'USD'")
+
+        if self.country != "CN":
+            raise ValueError("country must be 'CN'")
+
+        if self.valid_bank_acct and self.account_type not in ["C", "S"]:
+            raise ValueError("account_type must be 'C' or 'S' for non-card accounts")
+
+        if self.document_type in ["PASS", "TAXID"] and not self.document_type:
+            raise ValueError(
+                "document_type is required when document type is PASS or TAXID"
+            )
+
+        if self.purpose in ["EPBTOB", "EPREMT"] and not self.purpose:
+            raise ValueError(
+                "purpose is required for Business to Business (B2B) and Remittance (P2P)"
+            )
+
+        if self.document_type != "PASS" and not self.valid_han_beneficiary_name:
+            raise ValueError(
+                "beneficiary_name must contain only Han characters when document_type is not PASS"
+            )
